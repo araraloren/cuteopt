@@ -3,9 +3,9 @@ A little simple getopt tools for rust
 
 # USAGE
 
-[`Ctx`] hold all the [`OptKeeper`]s, provide the inteface parse the command line arguments.
+`Ctx` hold all the `OptKeeper`s, provide the inteface parse the command line arguments.
 
-```no_run
+```rust
 use cuteopt::prelude::*;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
