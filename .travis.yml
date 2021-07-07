@@ -11,7 +11,8 @@ addons:
 
 # run builds for all the trains (and more)
 rust:
-  # check it compiles on the latest stable compiler
+  - nightly
+  - beta
   - stable
 
 # load travis-cargo
@@ -34,3 +35,8 @@ after_success:
   # argument mitigates kcov crashes due to malformed debuginfo, at the
   # cost of some speed <https://github.com/huonw/travis-cargo/issues/12>)
   - travis-cargo coveralls --no-sudo --verify
+
+# needed to forbid travis-cargo to pass `--feature nightly` when building with nightly compiler
+env:
+  global:
+    - TRAVIS_CARGO_NIGHTLY_FEATURE=""
