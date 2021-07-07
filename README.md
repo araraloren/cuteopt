@@ -35,5 +35,9 @@ ctx.parse(&mut std::env::args().skip(1));
 dbg!(ctx.get_value_as_bool(ParseState::PSBoolean));
 ```
 
+# Documents
+
+see [`Documents`](https://araraloren.github.io/cuteopt/)
+
 # LICENSE
 MIT License
