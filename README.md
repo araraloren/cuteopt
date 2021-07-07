@@ -8,6 +8,7 @@ A little simple getopt tools for rust
 ```rust
 use cuteopt::prelude::*;
 
+// define a enum state for your options
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum ParseState {
     PSBoolean,
@@ -23,13 +24,15 @@ impl Default for ParseState {
 
 let mut ctx = Ctx::new();
 
+// add options
 ctx.add_bool("--boolean", ParseState::PSBoolean);
 ctx.add_str("--string", ParseState::PSString);
 
+// parse the given strings
 ctx.parse(&mut std::env::args().skip(1));
 
 // using ctx result
-// dbg!(ctx.get_value_as_bool(ParseState::PSBoolean));
+dbg!(ctx.get_value_as_bool(ParseState::PSBoolean));
 ```
 
 # LICENSE
