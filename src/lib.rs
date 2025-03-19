@@ -5,7 +5,7 @@ pub mod val;
 pub mod prelude {
     pub use crate::opt::*;
     pub use crate::val::*;
-    pub use crate::Ctx;
+    pub use crate::Cute;
 }
 
 pub use err::Error;
@@ -16,12 +16,12 @@ use opt::{State, StateOpt};
 use val::ValueParser;
 
 #[derive(Default)]
-pub struct Ctx<S: State> {
+pub struct Cute<S: State> {
     opts: Vec<Box<dyn StateOpt<S = S>>>,
     values: HashMap<S, Vec<String>>,
 }
 
-impl<S: State> Ctx<S> {
+impl<S: State> Cute<S> {
     pub fn new() -> Self {
         Self {
             opts: vec![],
@@ -130,24 +130,24 @@ mod tests {
             Unkown,
         }
 
-        let mut ctx = Ctx::new();
+        let mut cute = Cute::new();
 
-        ctx.add(switch("-bool", TestState::Bool));
-        ctx.add(option("-opt", TestState::Option));
-        ctx.add(switch("/?", TestState::Help));
-        ctx.add(switch("cmd", TestState::Cmd));
+        cute.add(switch("-bool", TestState::Bool));
+        cute.add(option("-opt", TestState::Option));
+        cute.add(switch("/?", TestState::Help));
+        cute.add(switch("cmd", TestState::Cmd));
 
         let args: Vec<String> = ["cmd", "-bool", "-opt", "value", "/?"]
             .iter()
             .map(|data| String::from(*data))
             .collect();
 
-        assert!(ctx.parse(&mut args.into_iter()).is_ok(),);
-        assert!(ctx.value::<bool>(TestState::Bool)?,);
-        assert!(ctx.value::<bool>(TestState::Help)?,);
-        assert!(ctx.value::<bool>(TestState::Cmd)?,);
+        assert!(cute.parse(&mut args.into_iter()).is_ok(),);
+        assert!(cute.value::<bool>(TestState::Bool)?,);
+        assert!(cute.value::<bool>(TestState::Help)?,);
+        assert!(cute.value::<bool>(TestState::Cmd)?,);
         assert_eq!(
-            ctx.value::<String>(TestState::Option)?,
+            cute.value::<String>(TestState::Option)?,
             String::from("value")
         );
         Ok(())
