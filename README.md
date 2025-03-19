@@ -6,33 +6,32 @@ A little simple getopt tools for rust
 `Ctx` hold all the `OptKeeper`s, provide the inteface parse the command line arguments.
 
 ```rust
-use cuteopt::prelude::*;
+    use cute::prelude::*;
+    use std::fmt::Debug;
+    use std::hash::Hash;
 
-// define a enum state for your options
-#[derive(Debug, Clone, Eq, PartialEq)]
-enum ParseState {
-    PSBoolean,
-    PSString,
-    PSDefault,
-}
-
-impl Default for ParseState {
-    fn default() -> Self {
-        Self::PSDefault
+    // define a enum state for your options
+    #[derive(Debug, Clone, Eq, PartialEq, Default, Hash)]
+    enum ParseState {
+        Boolean,
+        String,
+        #[default]
+        Default,
     }
-}
 
-let mut ctx = Ctx::new();
+    let mut ctx = Ctx::new();
 
-// add options
-ctx.add_bool("--boolean", ParseState::PSBoolean);
-ctx.add_str("--string", ParseState::PSString);
+    // add options
+    ctx.add(switch("--boolean", ParseState::Boolean));
+    ctx.add(option("--string", ParseState::String));
 
-// parse the given strings
-ctx.parse(&mut std::env::args().skip(1));
+    // parse the given strings
 
-// using ctx result
-dbg!(ctx.get_value_as_bool(ParseState::PSBoolean));
+    ctx.parse(["--boolean", "--string=32"].iter())?;
+
+    // using ctx result
+    assert!(ctx.value::<bool>(ParseState::Boolean)?);
+    assert_eq!(ctx.value::<&str>(ParseState::String)?, "32");
 ```
 
 # Documents
