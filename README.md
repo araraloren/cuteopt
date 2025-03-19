@@ -1,9 +1,9 @@
-# cuteopt
+# cute
 A little simple getopt tools for rust
 
 # USAGE
 
-`Ctx` hold all the `OptKeeper`s, provide the inteface parse the command line arguments.
+`Cute` hold all the `Opt`s, provide the inteface parse the command line arguments.
 
 ```rust
     use cute::prelude::*;
@@ -19,19 +19,19 @@ A little simple getopt tools for rust
         Default,
     }
 
-    let mut ctx = Ctx::new();
+    let mut cute = Cute::new();
 
     // add options
-    ctx.add(switch("--boolean", ParseState::Boolean));
-    ctx.add(option("--string", ParseState::String));
+    cute.add(switch("--boolean", ParseState::Boolean));
+    cute.add(option("--string", ParseState::String));
 
     // parse the given strings
 
-    ctx.parse(["--boolean", "--string=32"].iter())?;
+    cute.parse(["--boolean", "--string=32"].iter())?;
 
     // using ctx result
-    assert!(ctx.value::<bool>(ParseState::Boolean)?);
-    assert_eq!(ctx.value::<&str>(ParseState::String)?, "32");
+    assert!(cute.value::<bool>(ParseState::Boolean)?);
+    assert_eq!(cute.value::<&str>(ParseState::String)?, "32");
 ```
 
 # Documents
