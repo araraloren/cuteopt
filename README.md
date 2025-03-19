@@ -6,10 +6,11 @@ A little simple getopt tools for rust
 `Cute` hold all the `Opt`s, provide the inteface parse the command line arguments.
 
 ```rust
-    use cute::prelude::*;
-    use std::fmt::Debug;
-    use std::hash::Hash;
+use cute::prelude::*;
+use std::fmt::Debug;
+use std::hash::Hash;
 
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // define a enum state for your options
     #[derive(Debug, Clone, Eq, PartialEq, Default, Hash)]
     enum ParseState {
@@ -32,6 +33,8 @@ A little simple getopt tools for rust
     // using ctx result
     assert!(cute.value::<bool>(ParseState::Boolean)?);
     assert_eq!(cute.value::<&str>(ParseState::String)?, "32");
+    Ok(())
+}
 ```
 
 # Documents

@@ -17,12 +17,17 @@ use opt::{State, StateOpt};
 use val::ValueParser;
 
 #[derive(Default)]
+/// The main parser struct that holds options and their values.
+///
+/// # Type Parameters
+/// * `S` - The state type that implements the `State` trait
 pub struct Cute<S: State> {
     opts: Vec<Box<dyn StateOpt<S = S>>>,
     values: HashMap<S, Vec<String>>,
 }
 
 impl<S: State> Cute<S> {
+    /// Creates a new Cute instance with empty options and values.
     pub fn new() -> Self {
         Self {
             opts: vec![],
@@ -30,11 +35,22 @@ impl<S: State> Cute<S> {
         }
     }
 
+    /// Adds a new option to the parser.
+    ///
+    /// # Arguments
+    /// * `arg` - The option to add, must implement `StateOpt`
     pub fn add(&mut self, arg: impl StateOpt<S = S> + 'static) -> &mut Self {
         self.opts.push(Box::new(arg));
         self
     }
 
+    /// Gets an option by its state.
+    ///
+    /// # Arguments
+    /// * `s` - The state to search for
+    ///
+    /// # Returns
+    /// Option containing a reference to the option if found
     pub fn get(&self, s: S) -> Option<&dyn StateOpt<S = S>> {
         self.opts.iter().find(|v| v.state() == &s).map(|v| &**v)
     }
@@ -43,6 +59,16 @@ impl<S: State> Cute<S> {
         self.opts.iter().any(|v| v.state() == &s)
     }
 
+    /// Gets a parsed value for a given state.
+    ///
+    /// # Type Parameters
+    /// * `V` - The value parser type
+    ///
+    /// # Arguments
+    /// * `s` - The state to get the value for
+    ///
+    /// # Returns
+    /// Result containing the parsed value or an error
     pub fn value<V: ValueParser>(&self, s: S) -> Result<V::Out<'_>, V::Error> {
         let val = self.values.get(&s).and_then(|v| v.first());
 
@@ -63,6 +89,16 @@ impl<S: State> Cute<S> {
             .ok_or_else(|| Error::Value(format!("{s:?}")))
     }
 
+    /// Parses command-line arguments from an iterator.
+    ///
+    /// # Type Parameters
+    /// * `I` - The iterator type
+    ///
+    /// # Arguments
+    /// * `iter` - The iterator of arguments to parse
+    ///
+    /// # Returns
+    /// Result containing unprocessed arguments or an error
     pub fn parse<I: Iterator>(&mut self, iter: I) -> Result<Vec<String>, Error>
     where
         I::Item: ToString,
@@ -74,7 +110,7 @@ impl<S: State> Cute<S> {
             let mut matched = false;
 
             for opt in self.opts.iter_mut() {
-                if let opt::Match::Ok(val) = opt.r#match(&item) {
+                if let opt::Match::Okay(val) = opt.r#match(&item) {
                     matched = true;
 
                     let val = if opt.consume() {
@@ -101,6 +137,10 @@ impl<S: State> Cute<S> {
         Ok(rets)
     }
 
+    /// Parses arguments from the environment.
+    ///
+    /// # Returns
+    /// Result containing unprocessed arguments or an error
     pub fn parse_env(&mut self) -> Result<Vec<String>, Error> {
         self.parse(std::env::args())
     }
