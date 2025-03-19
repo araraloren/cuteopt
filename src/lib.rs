@@ -1,333 +1,155 @@
-use std::fmt::Debug;
-
-const DEFAULT_STR: &'static str = "";
+pub mod err;
+pub mod opt;
+pub mod val;
 
 pub mod prelude {
-    pub use super::Arg;
-    pub use super::Ctx;
+    pub use crate::opt::*;
+    pub use crate::val::*;
+    pub use crate::Ctx;
 }
 
-/// [`Arg`] hold option name and state
-#[derive(Debug, Clone)]
-pub enum Arg<'a, S>
-where
-    S: Debug + Clone + Eq + Default,
-{
-    Bool(&'a str, S),
-    Opt(&'a str, S),
+pub use err::Error;
+
+use std::collections::HashMap;
+
+use opt::{State, StateOpt};
+use val::ValueParser;
+
+#[derive(Default)]
+pub struct Ctx<S: State> {
+    opts: Vec<Box<dyn StateOpt<S = S>>>,
+    values: HashMap<S, Vec<String>>,
 }
 
-impl<'a, S> Arg<'a, S>
-where
-    S: Debug + Clone + Eq + Default,
-{
-    pub fn name(&self) -> &'a str {
-        match self {
-            Arg::Bool(name, _) | Arg::Opt(name, _) => name,
-        }
-    }
-
-    pub fn get_state(&self) -> &S {
-        match self {
-            Arg::Bool(_, state) | Arg::Opt(_, state) => &state,
-        }
-    }
-
-    pub fn is_bool(&self) -> bool {
-        match self {
-            Arg::Bool(_, _) => true,
-            _ => false,
-        }
-    }
-}
-
-/// [`Value`] hold the option value
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Value {
-    Bool(bool),
-    Str(String),
-    None,
-}
-
-impl Value {
-    pub fn from<'a, S>(arg: &Arg<'a, S>, value: String) -> Value
-    where
-        S: Debug + Clone + Eq + Default,
-    {
-        match arg {
-            Arg::Bool(_, _) => Value::Bool(true),
-            Arg::Opt(_, _) => Value::Str(value),
-        }
-    }
-
-    pub fn is_bool(&self) -> bool {
-        match self {
-            Value::Bool(_) => true,
-            _ => false,
-        }
-    }
-
-    pub fn as_bool(&self) -> bool {
-        match self {
-            Value::Bool(boolean) => *boolean,
-            _ => false,
-        }
-    }
-
-    pub fn as_str(&self) -> &str {
-        match self {
-            Value::Str(string) => string,
-            _ => DEFAULT_STR,
-        }
-    }
-}
-
-/// An simple option data struct
-#[derive(Debug, Clone)]
-pub struct OptKeeper<'a, S>
-where
-    S: std::fmt::Debug + Clone + Default + Eq,
-{
-    pub opt: Arg<'a, S>,
-    pub value: Value,
-}
-
-impl<'a, S> OptKeeper<'a, S>
-where
-    S: std::fmt::Debug + Clone + Default + Eq,
-{
-    pub fn name(&self) -> &'a str {
-        self.opt.name()
-    }
-
-    pub fn state(&self) -> &S {
-        self.opt.get_state()
-    }
-}
-
-/// [`Ctx`] hold all the [`OptKeeper`]s,
-/// provide the inteface parse the command line arguments.
-/// 
-/// ```no_run
-/// use cuteopt::prelude::*;
-/// 
-/// #[derive(Debug, Clone, Eq, PartialEq)]
-/// enum ParseState {
-///     PSBoolean,
-///     PSString,
-///     PSDefault,
-/// }
-/// 
-/// impl Default for ParseState {
-///     fn default() -> Self {
-///         Self::PSDefault
-///     }
-/// }
-/// 
-/// let mut ctx = Ctx::new();
-/// 
-/// ctx.add_bool("--boolean", ParseState::PSBoolean);
-/// ctx.add_str("--string", ParseState::PSString);
-/// 
-/// ctx.parse(&mut std::env::args().skip(1));
-/// 
-/// // using ctx result
-/// // dbg!(ctx.get_value_as_bool(ParseState::PSBoolean));
-/// ```
-#[derive(Debug, Default)]
-pub struct Ctx<'a, S>
-where
-    S: std::fmt::Debug + Clone + Default + Eq,
-{
-    opt_keeper_repo: Vec<OptKeeper<'a, S>>,
-}
-
-impl<'a, S> Ctx<'a, S>
-where
-    S: std::fmt::Debug + Clone + Default + Eq,
-{
+impl<S: State> Ctx<S> {
     pub fn new() -> Self {
-        Ctx {
-            opt_keeper_repo: vec![],
+        Self {
+            opts: vec![],
+            values: HashMap::default(),
         }
     }
 
-    pub fn add(&mut self, arg: Arg<'a, S>) -> &mut Self {
-        let value = match arg {
-            Arg::Bool(_, _) => Value::Bool(false),
-            _ => Value::None,
-        };
-        self.opt_keeper_repo.push(OptKeeper { opt: arg, value });
+    pub fn add(&mut self, arg: impl StateOpt<S = S> + 'static) -> &mut Self {
+        self.opts.push(Box::new(arg));
         self
     }
 
-    pub fn add_bool(&mut self, name: &'a str, s: S) -> &mut Self {
-        self.opt_keeper_repo.push(OptKeeper {
-            opt: Arg::Bool(name, s),
-            value: Value::Bool(false),
-        });
-        self
-    }
-
-    pub fn add_str(&mut self, name: &'a str, s: S) -> &mut Self {
-        self.opt_keeper_repo.push(OptKeeper {
-            opt: Arg::Opt(name, s),
-            value: Value::None,
-        });
-        self
-    }
-
-    pub fn get(&self, s: S) -> Option<&Arg<'a, S>> {
-        for opt_keeper in self.opt_keeper_repo.iter() {
-            if opt_keeper.opt.get_state().clone() == s {
-                return Some(&opt_keeper.opt);
-            }
-        }
-        None
+    pub fn get(&self, s: S) -> Option<&dyn StateOpt<S = S>> {
+        self.opts.iter().find(|v| v.state() == &s).map(|v| &**v)
     }
 
     pub fn has(&self, s: S) -> bool {
-        for opt_keeper in self.opt_keeper_repo.iter() {
-            if opt_keeper.opt.get_state().clone() == s {
-                return true;
-            }
-        }
-        false
+        self.opts.iter().any(|v| v.state() == &s)
     }
 
-    pub fn get_value(&self, s: S) -> Option<&Value> {
-        for opt_keeper in self.opt_keeper_repo.iter() {
-            if opt_keeper.opt.get_state().clone() == s {
-                return Some(&opt_keeper.value);
-            }
-        }
-        None
+    pub fn value<V: ValueParser>(&self, s: S) -> Result<V::Out<'_>, V::Error> {
+        let val = self.values.get(&s).and_then(|v| v.first());
+
+        V::parse(val)
     }
 
-    pub fn get_value_as_bool(&self, s: S) -> bool {
-        if let Some(value) = self.get_value(s) {
-            value.as_bool()
-        } else {
-            false
-        }
+    pub fn pop_raw_value(&mut self, s: S) -> Result<String, Error> {
+        self.values
+            .get_mut(&s)
+            .and_then(|v| v.pop())
+            .ok_or_else(|| Error::Value(format!("{s:?}")))
     }
 
-    pub fn get_value_as_str(&self, s: S) -> &str {
-        if let Some(value) = self.get_value(s) {
-            value.as_str()
-        } else {
-            DEFAULT_STR
-        }
+    pub fn raw_values(&self, s: S) -> Result<&[String], Error> {
+        self.values
+            .get(&s)
+            .map(|v| v.as_ref())
+            .ok_or_else(|| Error::Value(format!("{s:?}")))
     }
 
-    pub fn len(&self) -> usize {
-        self.opt_keeper_repo.len()
-    }
+    pub fn parse<I: Iterator>(&mut self, iter: I) -> Result<Vec<String>, Error>
+    where
+        I::Item: ToString,
+    {
+        let mut iter = iter.map(|v| v.to_string());
+        let mut rets = vec![];
 
-    fn _get_opt_i32(&self, index: i32) -> &OptKeeper<'a, S> {
-        &self.opt_keeper_repo[index as usize]
-    }
+        while let Some(item) = iter.next() {
+            let mut matched = false;
 
-    fn _get_opt_mut_i32(&mut self, index: i32) -> &mut OptKeeper<'a, S> {
-        &mut self.opt_keeper_repo[index as usize]
-    }
+            for opt in self.opts.iter_mut() {
+                if let opt::Match::Ok(val) = opt.r#match(&item) {
+                    matched = true;
 
-    pub fn parse(
-        &mut self,
-        args: &mut impl Iterator<Item = String>,
-    ) -> Result<Vec<String>, String> {
-        let mut while_flag = true;
-        let mut ret = vec![];
-
-        while while_flag {
-            let mut current_index: i32 = -1;
-
-            match args.next() {
-                Some(arg) => {
-                    for index in 0..self.len() {
-                        if self._get_opt_i32(index as i32).name() == arg {
-                            current_index = index as i32;
-                            break;
+                    let val = if opt.consume() {
+                        if let Some(val) = val {
+                            val.to_string()
+                        } else {
+                            iter.next()
+                                .ok_or_else(|| Error::Argument(opt.name().to_string()))?
                         }
-                    }
+                    } else {
+                        String::default()
+                    };
 
-                    if current_index == -1 {
-                        ret.push(arg);
-                    }
-                }
-                None => {
-                    while_flag = false;
+                    self.values
+                        .entry(opt.state().clone())
+                        .or_default()
+                        .push(val);
                 }
             }
-
-            if current_index != -1 {
-                if self._get_opt_i32(current_index).opt.is_bool() {
-                    self._get_opt_mut_i32(current_index).value = Value::Bool(true);
-                } else {
-                    match args.next() {
-                        Some(value) => {
-                            self._get_opt_mut_i32(current_index).value = Value::Str(value);
-                        }
-                        None => {
-                            return Err(format!(
-                                "Option need argument: {:?}",
-                                self._get_opt_i32(current_index).opt
-                            ));
-                        }
-                    }
-                }
+            if !matched {
+                rets.push(item);
             }
         }
-        return Ok(ret);
+        Ok(rets)
+    }
+
+    pub fn parse_env(&mut self) -> Result<Vec<String>, Error> {
+        self.parse(std::env::args())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        opt::{option, switch},
+        Error,
+    };
+
     #[test]
     fn opt_test() {
+        assert!(opt_test_impl().is_ok());
+    }
+
+    fn opt_test_impl() -> Result<(), Error> {
         use super::*;
 
-        #[derive(Debug, Clone, PartialEq, Eq)]
+        #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
         enum TestState {
-            CmdState,
-            BoolState,
-            OptionState,
-            HelpState,
-            UnknowState,
-        }
-
-        impl Default for TestState {
-            fn default() -> TestState {
-                TestState::UnknowState
-            }
+            Cmd,
+            Bool,
+            Option,
+            Help,
+            #[default]
+            Unkown,
         }
 
         let mut ctx = Ctx::new();
 
-        ctx.add(Arg::Bool("-bool", TestState::BoolState));
-        ctx.add(Arg::Opt("-opt", TestState::OptionState));
-        ctx.add(Arg::Bool("/?", TestState::HelpState));
-        ctx.add(Arg::Bool("cmd", TestState::CmdState));
+        ctx.add(switch("-bool", TestState::Bool));
+        ctx.add(option("-opt", TestState::Option));
+        ctx.add(switch("/?", TestState::Help));
+        ctx.add(switch("cmd", TestState::Cmd));
 
         let args: Vec<String> = ["cmd", "-bool", "-opt", "value", "/?"]
             .iter()
             .map(|data| String::from(*data))
             .collect();
 
-        assert_eq!(ctx.parse(&mut args.into_iter()).is_ok(), true);
+        assert!(ctx.parse(&mut args.into_iter()).is_ok(),);
+        assert!(ctx.value::<bool>(TestState::Bool)?,);
+        assert!(ctx.value::<bool>(TestState::Help)?,);
+        assert!(ctx.value::<bool>(TestState::Cmd)?,);
         assert_eq!(
-            ctx.get_value(TestState::BoolState),
-            Some(&Value::Bool(true))
+            ctx.value::<String>(TestState::Option)?,
+            String::from("value")
         );
-        assert_eq!(
-            ctx.get_value(TestState::HelpState),
-            Some(&Value::Bool(true))
-        );
-        assert_eq!(ctx.get_value(TestState::CmdState), Some(&Value::Bool(true)));
-        assert_eq!(
-            ctx.get_value(TestState::OptionState),
-            Some(&Value::Str(String::from("value")))
-        );
+        Ok(())
     }
 }
